@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Notes</title>
+    <style>
+        body { font-family: system-ui; max-width: 720px; margin: 24px auto; }
+        h1 { margin-bottom: 12px; }
+        form, .note { display: flex; gap: 8px; margin: 8px 0; }
+        input[type="text"] { flex: 1; padding: 8px; }
+        button { padding: 6px 10px; }
+        .note { align-items: center; }
+        .id { width: 44px; color: #666; }
+        .time { color:#888; font-size:12px; }
+    </style>
+</head>
+<body>
+<h1>Notes</h1>
+
+<form id="createForm">
+    <input id="newText" type="text" placeholder="메모를 입력하세요" required />
+    <button type="submit">추가</button>
+</form>
+
+<div id="list"></div>
+
+<script>
+  const api = '/api/notes';
+  const $list = document.getElementById('list');
+  const $create = document.getElementById('createForm');
+  const $newText = document.getElementById('newText');
+
+  const fmt = (iso) => new Date(iso).toLocaleString();
+
+  async function load() {
+    const res = await fetch(api);
+    const data = await res.json();
+    render(data);
+  }
+
+  function render(items) {
+    $list.innerHTML = '';
+    if (!items.length) {
+      $list.innerHTML = '<p>메모가 없습니다.</p>';
+      return;
+    }
+    for (const n of items) {
+      const div = document.createElement('div');
+      div.className = 'note';
+      div.innerHTML = `
+        <span class="id">#${n.id}</span>
+        <input type="text" value="${escapeHtml(n.text)}" data-id="${n.id}" class="edit" />
+        <span class="time">${fmt(n.createdAt)}</span>
+        <button data-id="${n.id}" class="save">저장</button>
+        <button data-id="${n.id}" class="del">삭제</button>
+      `;
+      $list.appendChild(div);
+    }
+    bindRowEvents();
+  }
+
+  function bindRowEvents() {
+    $list.querySelectorAll('.save').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.dataset.id;
+        const input = $list.querySelector(`.edit[data-id="${id}"]`);
+        await fetch(`${api}/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: input.value })
+        });
+        await load();
+      };
+    });
+    $list.querySelectorAll('.del').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.dataset.id;
+        await fetch(`${api}/${id}`, { method: 'DELETE' });
+        await load();
+      };
+    });
+  }
+
+  $create.onsubmit = async (e) => {
+    e.preventDefault();
+    const text = $newText.value.trim();
+    if (!text) return;
+    await fetch(api, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    $newText.value = '';
+    await load();
+  };
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  load();
+</script>
+</body>
+</html>

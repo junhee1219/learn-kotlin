@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Text Analyze</title>
+    <style>
+        body { font-family: system-ui; max-width: 880px; margin: 24px auto; }
+        form { display: grid; gap: 8px; grid-template-columns: 1fr auto; align-items: start; }
+        textarea { grid-column: 1 / -1; width: 100%; height: 160px; padding: 8px; }
+        button { padding: 8px 12px; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+        .card { border:1px solid #ddd; padding:10px; border-radius:8px; text-align:center; }
+        table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+        th, td { border:1px solid #ddd; padding:8px; text-align:center; }
+        th { background:#f7f7f7; }
+        .muted { color:#777; font-size:12px; }
+    </style>
+</head>
+<body>
+<h1>Text Analyze</h1>
+
+<form id="form">
+    <textarea id="text" placeholder="여기에 텍스트를 입력하세요">동해물과 백두산이 마르고 닳도록 하느님이 보우하사 우리나라만세. 무궁화 3000리 화려강산~~</textarea>
+    <button type="submit">분석</button>
+</form>
+
+<div class="grid" id="cards" hidden>
+    <div class="card"><div>Length</div><strong id="length">0</strong></div>
+    <div class="card"><div>Words</div><strong id="wordCount">0</strong></div>
+    <div class="card"><div>Digits</div><strong id="digitCount">0</strong></div>
+    <div class="card"><div>Vowels</div><strong id="vowelCount">0</strong></div>
+    <div class="card"><div>Upper</div><strong id="upperCount">0</strong></div>
+    <div class="card"><div>Lower</div><strong id="lowerCount">0</strong></div>
+    <div class="card"><div>Spaces</div><strong id="spaceCount">0</strong></div>
+    <div class="card"><div>Top Char</div><strong id="topChar">-</strong></div>
+</div>
+
+<table id="freqTbl" hidden>
+    <thead>
+    <tr><th>Char</th><th>Count</th></tr>
+    </thead>
+    <tbody id="freqBody"></tbody>
+</table>
+
+<script>
+  const $form = document.getElementById('form');
+  const $text = document.getElementById('text');
+  const el = id => document.getElementById(id);
+
+  $form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = JSON.stringify({ text: $text.value });
+
+    const res = await fetch('/api/analyze/text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    });
+    if (!res.ok) {
+      alert('분석 실패');
+      return;
+    }
+    const data = await res.json();
+
+    // 카드 채우기
+    el('length').textContent = data.length;
+    el('wordCount').textContent = data.wordCount;
+    el('digitCount').textContent = data.digitCount;
+    el('vowelCount').textContent = data.vowelCount;
+    el('upperCount').textContent = data.upperCount;
+    el('lowerCount').textContent = data.lowerCount;
+    el('spaceCount').textContent = data.spaceCount;
+    el('topChar').textContent = data.topChar ? `${data.topChar.ch} (${data.topChar.count})` : '-';
+    document.getElementById('cards').hidden = false;
+
+    // 빈도 테이블(요청 본문을 다시 세서 보여줌: for/if 연습)
+    const s = $text.value;
+    const freq = new Map();
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (!/\s/.test(c)) {
+        freq.set(c, (freq.get(c) || 0) + 1);
+      }
+    }
+    const rows = [...freq.entries()].sort((a,b) => b[1]-a[1]);
+    const $tbody = document.getElementById('freqBody');
+    $tbody.innerHTML = rows.map(([ch, cnt]) => `<tr><td>${escapeHtml(ch)}</td><td>${cnt}</td></tr>`).join('');
+    document.getElementById('freqTbl').hidden = rows.length === 0;
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+</script>
+</body>
+</html>
